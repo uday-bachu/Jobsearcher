@@ -313,6 +313,52 @@ npm run gemini:eval -- "JD text here"
 
 > **Free tier:** Both options work without billing. Native CLI uses Google OAuth; the API script uses `gemini-3.6-flash` (rate limits are model- and tier-dependent; see Google AI docs for current quotas).
 
+### One-Command Review Workflow
+
+The local runner is CLI-first: it uses the first installed and authenticated
+agent CLI in this order: Copilot CLI, Claude Code, Codex, then OpenCode. It
+scans configured sources and asks that agent to evaluate direct postings and
+prepare review artifacts. It never opens, fills, or submits an application.
+
+```bash
+npm run run:jobs
+npm run run:jobs -- --cli copilot --limit 3
+```
+
+API-backed runs work without an agent CLI. Put credentials in `.env` (which is
+gitignored); use the base URL only, without `/chat/completions`, because the
+client appends that path.
+
+```bash
+# Gemini Developer API
+GEMINI_API_KEY=your_key
+GEMINI_MODEL=gemini-3.7-flash
+
+# Any OpenAI-compatible API: OpenAI, OpenRouter, Groq, Together, DeepSeek,
+# local Ollama /v1, LM Studio, vLLM, or llama.cpp.
+OPENAI_API_KEY=your_key
+OPENAI_BASE_URL=https://openrouter.ai/api/v1
+OPENAI_MODEL=your-available-model
+```
+
+```bash
+npm run run:jobs:gemini -- --limit 3
+npm run run:jobs:openai -- --limit 3
+```
+
+For each verified role scored at least `4.0/5`, the API route archives the JD,
+generates an ATS-safe single-column resume PDF and a cover-letter PDF, and runs
+the fact and ATS checks before publishing artifacts. Files are stored at:
+
+```text
+output/<company>/<role>/<prepared-date>/
+```
+
+Every run writes `data/latest-job-run.md`, listing the employer, exact role,
+visible job ID when available, score, location, artifact paths, direct apply
+URL, and whether the role is ready for review. Review the generated documents
+and submit applications yourself.
+
 ## Usage
 
 career-ops uses a shared command router. In CLIs that register slash commands, it looks like this:

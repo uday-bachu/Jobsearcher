@@ -72,6 +72,15 @@ try {
     throw new Error('nested application paths were not preserved as repo-relative manifest entries');
   }
 
+  const datedPaths = applicationArtifactPaths({ reportNum: 7, company: 'Acme AI', role: 'Senior AI Engineer', preparedDate: '2026-09-18', root });
+  if (datedPaths.root === join(root, 'acme-ai', 'senior-ai-engineer', '2026-09-18')
+      && datedPaths.cv.tailored.pdf === join(root, 'acme-ai', 'senior-ai-engineer', '2026-09-18', 'cv', 'tailored', 'v001', 'cv.pdf')) {
+    console.log('  ✅ prepared date creates a company/role/date artifact bundle');
+  } else {
+    throw new Error(`prepared-date paths were unexpected: ${JSON.stringify(datedPaths)}`);
+  }
+  expectError('prepared dates use ISO format', () => applicationArtifactPaths({ reportNum: 7, company: 'Acme', role: 'Engineer', preparedDate: '18-09-2026', root }), /preparedDate must use YYYY-MM-DD/);
+
   const cli = spawnSync(process.execPath, [
     fileURLToPath(new URL('../application-artifacts.mjs', import.meta.url)),
     '--report', 'bad', '--company', 'Acme', '--role', 'Engineer', '--init',

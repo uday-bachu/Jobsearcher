@@ -27,16 +27,30 @@ export function slugifySegment(value, fallback = 'application') {
   return slug || fallback;
 }
 
+function normalizePreparedDate(value) {
+  if (value === undefined || value === null || value === '') return '';
+  const date = String(value);
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || Number.isNaN(Date.parse(`${date}T00:00:00Z`))) {
+    throw new Error('preparedDate must use YYYY-MM-DD');
+  }
+  return date;
+}
+
 /** Return all stable paths belonging to one application artifact bundle. */
-export function applicationArtifactPaths({ reportNum, company, role, version = 1, root = DEFAULT_OUTPUT_ROOT }) {
+export function applicationArtifactPaths({ reportNum, company, role, version = 1, root = DEFAULT_OUTPUT_ROOT, preparedDate }) {
   if (!/^\d+$/.test(String(reportNum ?? ''))) {
     throw new Error('reportNum must be a numeric report number');
   }
   if (!/^\d+$/.test(String(version ?? '')) || Number(version) < 1) {
     throw new Error('version must be a positive integer');
   }
-  const key = `${String(reportNum).padStart(3, '0')}-${slugifySegment(company)}-${slugifySegment(role, 'role')}`;
-  const applicationRoot = join(resolve(root), key);
+  const date = normalizePreparedDate(preparedDate);
+  const companySlug = slugifySegment(company);
+  const roleSlug = slugifySegment(role, 'role');
+  const key = `${String(reportNum).padStart(3, '0')}-${companySlug}-${roleSlug}`;
+  const applicationRoot = date
+    ? join(resolve(root), companySlug, roleSlug, date)
+    : join(resolve(root), key);
   const tailoredRoot = join(applicationRoot, 'cv', 'tailored', `v${String(version).padStart(3, '0')}`);
   return {
     key,
@@ -111,13 +125,13 @@ export function writeReuseDecision(paths, {
 // its own to say anything better: without it `--report --help` consumed the
 // next token, printed usage and exited 0 (the #2961 class), so a malformed
 // flag went unreported.
-const KNOWN_FLAGS = ['--report', '--company', '--role', '--version', '--root', '--init', '--help', '-h'];
+const KNOWN_FLAGS = ['--report', '--company', '--role', '--version', '--root', '--prepared-date', '--init', '--help', '-h'];
 
 // Every flag except --init takes its value as the next argv token.
-const VALUE_FLAGS = ['--report', '--company', '--role', '--version', '--root'];
+const VALUE_FLAGS = ['--report', '--company', '--role', '--version', '--root', '--prepared-date'];
 
 const USAGE = `Usage:
-  node application-artifacts.mjs --report N --company NAME --role ROLE [--version N] [--root DIR] [--init]
+  node application-artifacts.mjs --report N --company NAME --role ROLE [--prepared-date YYYY-MM-DD] [--version N] [--root DIR] [--init]
 
 Prints the resolved artifact paths for one application as JSON. The directory
 key is stable for a report/company/role tuple, so the JD, source CV, tailored
@@ -126,6 +140,7 @@ CV, PDF and reuse decision stay together.
   --report N       report number the bundle belongs to (required)
   --company NAME   company name (required)
   --role ROLE      role title (required)
+  --prepared-date  store artifacts under output/<company>/<role>/<YYYY-MM-DD>/
   --version N      tailored-CV version (default: 1)
   --root DIR       output root (default: output)
   --init           create the directories as well as printing the paths
@@ -138,6 +153,7 @@ async function main() {
       report: { type: 'string' },
       company: { type: 'string' },
       role: { type: 'string' },
+      'prepared-date': { type: 'string' },
       version: { type: 'string', default: '1' },
       root: { type: 'string' },
       init: { type: 'boolean' },
@@ -149,7 +165,7 @@ async function main() {
     process.exitCode = 1;
     return;
   }
-  const paths = applicationArtifactPaths({ reportNum: values.report, company: values.company, role: values.role, version: values.version, root: values.root });
+  const paths = applicationArtifactPaths({ reportNum: values.report, company: values.company, role: values.role, version: values.version, root: values.root, preparedDate: values['prepared-date'] });
   if (values.init) ensureApplicationArtifactDirs(paths);
   console.log(JSON.stringify(paths, null, 2));
 }
